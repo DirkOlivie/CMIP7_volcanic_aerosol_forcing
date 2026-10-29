@@ -127,6 +127,9 @@ def obtain_waveband_limits(wv_min_sw, wv_max_sw, wv_min_lw, wv_max_lw):
     exclusion_lw     = [False, False, True, False, True, False, False, False, False]
     excluded_band_lw = [0,     0,      4,    0,     6,    0,     0,     0,     0]
 
+    exclusion_lw     = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    excluded_band_lw = [0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0,     0    ]
+
     return wv_mid_sw, wv_mid_lw, wv_mid_all, wv_bnds_sw, wv_bnds_lw, wv_bnds_all, nsw, nlw, exclusion_lw, excluded_band_lw 
 
 def interpolate_to_wavebands(ext_source, ssa_source, asy_source, 
@@ -170,11 +173,18 @@ def weighted_avg_interpolation(ext, ssa, asy, wvs_source_data, band_min, band_ma
     ext_out = np.zeros((ntimes, nlats, nalts, nbands))
     ssa_out = np.zeros((ntimes, nlats, nalts, nbands))
     asy_out = np.zeros((ntimes, nlats, nalts, nbands))
+
+    ext_out[:,:,:,:] = np.nan
+    ssa_out[:,:,:,:] = np.nan
+    asy_out[:,:,:,:] = np.nan
     
     # Interpolation functions
-    interp_func_ext = interp1d(wvs_source_data, ext, axis=3, kind='linear', bounds_error=False, fill_value="extrapolate")
-    interp_func_ssa = interp1d(wvs_source_data, ssa, axis=3, kind='linear', bounds_error=False, fill_value="extrapolate")
-    interp_func_asy = interp1d(wvs_source_data, asy, axis=3, kind='linear', bounds_error=False, fill_value="extrapolate")
+#    interp_func_ext = interp1d(wvs_source_data, ext, axis=3, kind='linear', bounds_error=False, fill_value="extrapolate")
+#    interp_func_ssa = interp1d(wvs_source_data, ssa, axis=3, kind='linear', bounds_error=False, fill_value="extrapolate")
+#    interp_func_asy = interp1d(wvs_source_data, asy, axis=3, kind='linear', bounds_error=False, fill_value="extrapolate")
+    interp_func_ext = interp1d(wvs_source_data, ext, axis=3, kind='linear', bounds_error=False, fill_value=(ext[:,:,:,0],ext[:,:,:,-1]))
+    interp_func_ssa = interp1d(wvs_source_data, ssa, axis=3, kind='linear', bounds_error=False, fill_value=(ssa[:,:,:,0],ssa[:,:,:,-1]))
+    interp_func_asy = interp1d(wvs_source_data, asy, axis=3, kind='linear', bounds_error=False, fill_value=(asy[:,:,:,0],asy[:,:,:,-1]))
 
     for iband in np.arange(0,nbands):
 
@@ -234,6 +244,11 @@ def weighted_avg_interpolation(ext, ssa, asy, wvs_source_data, band_min, band_ma
                         weighting = basic_weighting * ext_grid * ssa_grid
                         asy_out[itime, ilat, ialt, iband] = weighted_avg(asy_grid, weighting)
 
+                    elif np.sum(ext_grid) == 0.:
+                        ext_out[itime, ilat, ialt, iband] = 0.
+                        ssa_out[itime, ilat, ialt, iband] = 0.
+                        asy_out[itime, ilat, ialt, iband] = 0.
+                    
     return ext_out, ssa_out, asy_out
 
 def weighted_avg(var, weighting):
@@ -252,12 +267,13 @@ def plank_function(wv, Trep):
 
     return plank_irrad
 
-def read_cmip7_source_data_v130(source_dir, filename_part, opt_prop_name, \
+def read_cmip7_source_data_v130(source_dir, data_version, filename_part, opt_prop_name, \
                                 expected_dimension_keys, skip_uv_wvs=0,   \
                                 first_month=0, last_month=1,              \
                                 verbose=False):
     
-    source_filepath = Path(source_dir) / "{}{}".format(opt_prop_name, filename_part)
+    # source_filepath = Path(source_dir) / "{}{}".format(opt_prop_name, filename_part)
+    source_filepath = Path(source_dir) / data_version /  "{}{}".format(opt_prop_name, filename_part)
     
     # Reading the source file
     print("\n### Opening the cmip7 datafile: \n", source_filepath)
@@ -434,20 +450,44 @@ if __name__ == '__main__':
     # data and outputs
     ###############################################################################
     #
-    source_dir   = '/your_base_directory/v1.3.0'
+    # source_dir   = '/your_base_directory/v1.3.0'
     
     # Data version. This could be used in the directory structure below source_dir 
     # data_version = 'v20250122'
     
     # Filenames minus the 3-charcter string at the start corresponding to the optical property name 
     #
-    filename_part = '_input4MIPs_aerosolProperties_CMIP_UOEXETER-CMIP-1-3-0_gnz_185001-202112-clim.nc'
+    # filename_part = '_input4MIPs_aerosolProperties_CMIP_UOEXETER-CMIP-1-3-0_gnz_185001-202112-clim.nc'
+    # filename_part = '_input4MIPs_aerosolProperties_CMIP_UOEXETER-CMIP-2-1-0_gnz_175001-202312.nc'
 
     # Output file for interpolated data
     #
-    output_dir = 'your_output_dir'
+    # output_dir = 'your_output_dir'
     
-    interpolated_filename_part  = 'CMIP7_interpolated'
+    # interpolated_filename_part  = 'CMIP7_interpolated'
+
+
+    #
+    source_dir = '/nird/datalake/NS9560K/noresm3/input4mips/cmip7'
+    
+    # Data version. This could be used in the directory structure below source_dir 
+    # data_version = 'v20250122'
+    data_version = 'UOEXETER-CMIP-2-2-1'
+    
+    # Filenames minus the 3-charcter string at the start corresponding to the optical property name 
+    period='175001-202312'
+    period='185001-202112-clim'
+    period='185001-202112-clim-wghtavg'
+
+    #
+    filename_part = '_input4MIPs_aerosolProperties_CMIP_'+data_version+'_gnz_'+period+'.nc'
+
+    # Output file for interpolated data
+    #
+    output_dir = '/scratch/olivie/code/python-external/CMIP7_volcanic_aerosol_forcing/output'
+    
+    interpolated_filename_part  = 'intpwghtavg'+'_input4MIPs_aerosolProperties_CMIP_'+data_version+'_gnz_'+period
+
 
     ###############################################################################
     # 2. Specify the wavelength limits of the radiation scheme bands
@@ -461,6 +501,9 @@ if __name__ == '__main__':
     wv_min_sw = np.array([2.0e-07, 3.2e-07, 5.05e-07, 6.9e-07, 1.19e-06, 2.38e-06])
     wv_max_sw = np.array([3.2e-07, 5.05e-07, 6.9e-07, 1.19e-06, 2.38e-06, 1.0e-05])
         
+    wv_min_sw = np.array([0.2, 0.263158, 0.344828, 0.441501, 0.625, 0.77821, 1.24224, 1.2987, 1.62602, 1.94175, 2.15054, 2.5, 3.07692, 3.84615]) * 1.e-6
+    wv_max_sw = np.array([     0.263158, 0.344828, 0.441501, 0.625, 0.77821, 1.24224, 1.2987, 1.62602, 1.94175, 2.15054, 2.5, 3.07692, 3.84615, 12.1951]) * 1.e-6
+
     # These are the wavelength boundaries of the Met Office Unified Model shortwave 
     # radiation scheme, as of Global Atmosphere configuration GA7/8/9
     #
@@ -468,6 +511,9 @@ if __name__ == '__main__':
     
     wv_min_lw = np.array([25.0e-06, 18.182e-06, 12.500e-06, 13.333e-06, 8.333e-06, 8.929e-06, 7.519e-06, 6.667e-06, 3.339e-06]) 
     wv_max_lw = np.array([100.0e-06,  25.0e-06, 18.182e-06, 16.949e-06, 12.50e-06, 1.010e-05, 8.333e-06, 7.519e-06, 6.667e-06]) 
+
+    wv_min_lw = np.array([3.07692, 3.84615, 4.20168, 4.44444, 4.80769, 5.55556, 6.75676, 7.19424, 8.47458, 9.25926, 10.2041, 12.1951, 14.2857, 15.873, 20, 28.5714]) * 1.e-6
+    wv_max_lw = np.array([         3.84615, 4.20168, 4.44444, 4.80769, 5.55556, 6.75676, 7.19424, 8.47458, 9.25926, 10.2041, 12.1951, 14.2857, 15.873, 20, 28.5714, 1000 ]) * 1.e-6
 
     # Users may want to avoid reading data from the source file corresponding to the first wavelength
     # if that falls outside the spectral range of the radiation scheme. 
@@ -495,8 +541,24 @@ if __name__ == '__main__':
                      # to final month of the timeseries   
     #
     # If reading from the 12-month historical average climatology set to 1 and 12
-    first_month = 1
-    last_month  = 12
+    #first_month = 1
+    #last_month  = 12
+
+    #first_month = Jan_1750
+    #last_month  = Dec_2023
+    
+    if ( period == '185001-202112-clim' \
+      or period == '185001-202112-clim-stndavg' \
+      or period == '185001-202112-clim-wghtavg' ) : 
+        first_month = 1
+        last_month  = 12
+    elif (  period == '175001-202312' ) :
+        first_month = Jan_1750
+        last_month  = Dec_2023
+    else :
+        print('No period recognized : ', period)
+        quit()
+
 
     ###############################################################################
     # 4. Specify what you would like this script to do
@@ -522,6 +584,7 @@ if __name__ == '__main__':
 
     ###############################################################################
     
+
 
     ###############################################################################
     # This obtains the wavelength limits of the SW and LW bands of the model that 
@@ -560,21 +623,21 @@ if __name__ == '__main__':
     # Get the optical properties from the source files
     #   
     source_dataset_ext, ext_source, wvs_source, time = \
-                read_cmip7_source_data_v130(source_dir, filename_part, \
+                read_cmip7_source_data_v130(source_dir, data_version, filename_part, \
                                             'ext', expected_dimension_keys, \
                                             skip_uv_wvs=skip_uv_wvs, \
                                             first_month=first_month, last_month=last_month, \
                                             verbose=verbose)
 
     source_dataset_ssa, ssa_source, wvs_source, time = \
-                read_cmip7_source_data_v130(source_dir, filename_part, \
+                read_cmip7_source_data_v130(source_dir, data_version, filename_part, \
                                             'ssa', expected_dimension_keys, \
                                             skip_uv_wvs=skip_uv_wvs, \
                                             first_month=first_month, last_month=last_month, \
                                             verbose=verbose)
 
     source_dataset_asy, asy_source, wvs_source, time = \
-                read_cmip7_source_data_v130(source_dir, filename_part, \
+                read_cmip7_source_data_v130(source_dir, data_version, filename_part, \
                                             'asy', expected_dimension_keys, \
                                             skip_uv_wvs=skip_uv_wvs, \
                                             first_month=first_month, last_month=last_month, \
